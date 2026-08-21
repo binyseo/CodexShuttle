@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-shuttle"
+version = "0.1.0"
+description = "Codex 작업을 위임받아 실행하고 대화 세션을 관찰하는 데스크톱 도구"
+requires-python = ">=3.12"
+dependencies = [
+    "PyQt6==6.11.0",
+]
+
+[project.scripts]
+# 클로드 세션이 Bash로 부르는 명령. `codex-shuttle gui` 로 앱도 띄운다.
+codex-shuttle = "codex_shuttle.client.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["codex_shuttle*"]
+
+[tool.setuptools.package-data]
+# 스킬 파일은 `codex-shuttle install-skill` 이 꺼내 쓰므로 패키지에 함께 넣는다.
+codex_shuttle = ["skill/*.md"]

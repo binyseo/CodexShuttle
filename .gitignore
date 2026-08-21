@@ -1,0 +1,22 @@
+# 클로드 로컬 설정과 배치된 스킬. 스킬 원본은 codex_shuttle/skill/SKILL.md 이고,
+# 각자 `codex-shuttle install-skill` 로 자기 환경에 꺼내 쓴다.
+.claude/
+
+# codex 위임 작업 파일·보고서
+.codex-shuttle/
+
+# IDE
+.idea/
+.vscode/
+
+# 파이썬
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# 로컬 MCP 설정 (머신별 포트)
+.mcp.json
