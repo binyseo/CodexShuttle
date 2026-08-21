@@ -17,14 +17,13 @@ from PyQt6.QtWidgets import (
 )
 
 from codex_shuttle.core.account import ModelInfo
-from codex_shuttle.core.job import ApprovalRequest, Job, JobItem, JobOrigin
+from codex_shuttle.core.job import ApprovalRequest, Job, JobItem
 from codex_shuttle.core.job_runner import JobRunner
 from codex_shuttle.core import transcript
 from codex_shuttle.ui import theme
 from codex_shuttle.ui.approval_widget import ApprovalWidget
 from codex_shuttle.ui.conversation_view import ConversationView
 from codex_shuttle.ui.job_list import JobListWidget, STATE_LABELS
-from codex_shuttle.ui.new_job_dialog import NewJobDialog
 
 _LIST_WIDTH = 240
 
@@ -65,11 +64,6 @@ class JobPanel(QWidget):
         layout = QVBoxLayout(holder)
         layout.setContentsMargins(8, 8, 4, 8)
         layout.setSpacing(6)
-
-        self._new_button = QPushButton("+ New job")
-        self._new_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._new_button.clicked.connect(self._on_new_job)
-        layout.addWidget(self._new_button)
 
         self._list = JobListWidget()
         self._list.jobSelected.connect(self._on_job_selected)
@@ -127,19 +121,8 @@ class JobPanel(QWidget):
         return holder
 
     def set_models(self, models: Sequence[ModelInfo]) -> None:
-        """새 잡 대화상자의 모델 목록을 갱신한다."""
+        """대화 헤더에 어떤 모델로 돌았는지 적기 위해 목록을 들고 있는다."""
         self._models = tuple(models)
-
-    def _on_new_job(self) -> None:
-        dialog = NewJobDialog(self._models, default_cwd="", parent=self)
-        if dialog.exec() != NewJobDialog.DialogCode.Accepted:
-            return
-        spec = dialog.spec()
-        if not spec.prompt:
-            QMessageBox.warning(self, "New job", "Enter the task first.")
-            return
-        # GUI에서 만든 잡은 클로드 세션에 노출되지 않는다.
-        self._runner.submit(spec, origin=JobOrigin.LOCAL)
 
     def _on_job_added(self, job: Job) -> None:
         view = ConversationView()
@@ -257,6 +240,9 @@ class JobPanel(QWidget):
             job.spec.approval_policy,
         ]
         self._header_meta.setText("  ·  " + " · ".join(meta))
+        # 끝난 잡은 중단할 것이 없고, 선택된 잡은 언제든 내역을 뽑을 수 있다.
+        self._interrupt.setEnabled(not job.state.is_final)
+        self._save_button.setEnabled(True)
 
     def _job_model(self, job: Job) -> ModelInfo | None:
         """이 잡에 적용되는 모델 정보. 지정이 없으면 기본 모델을 본다."""
@@ -284,8 +270,6 @@ class JobPanel(QWidget):
         if model is not None and model.default_effort:
             return "default ({0})".format(model.default_effort)
         return "Default effort"
-        self._interrupt.setEnabled(not job.state.is_final)
-        self._save_button.setEnabled(True)
 
     def _refresh_attention(self) -> None:
         """승인 대기 중인 잡 중 지금 보고 있지 않은 것만 깜빡이게 한다."""

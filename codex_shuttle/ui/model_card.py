@@ -58,4 +58,6 @@ class ModelCard(StatusCard):
             item = self._grid.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                # deleteLater만 하면 이벤트 루프가 돌기 전까지 화면에 남는다.
+                widget.setParent(None)
                 widget.deleteLater()

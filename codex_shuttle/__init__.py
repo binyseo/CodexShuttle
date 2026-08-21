@@ -3,4 +3,4 @@
 __all__ = ["APP_NAME", "__version__"]
 
 APP_NAME = "CodexShuttle"
-__version__ = "0.1.0"
+__version__ = "0.2.0"

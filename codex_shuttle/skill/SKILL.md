@@ -33,6 +33,20 @@ Do not retry on your own — hand it to the user.
 If `usage.remaining_percent` is low (say under 10%), say so before handing over a
 big job. `window` carries the reset time.
 
+### Not every setup goes through ChatGPT
+
+`provider` tells you which one this is.
+
+```json
+"provider": { "name": "ollama", "chatgpt_auth": false, "source": "app-server" }
+```
+
+When `chatgpt_auth` is `false` the user runs codex against a local or third-party
+model provider. Sign-in and usage limits do not apply there: `account` reads as not
+signed in, `usage.remaining_percent` is `null`, and neither one becomes a blocker.
+Do not tell such a user to run `codex login`, and do not weigh usage when picking a
+model — read `models` instead, where `efforts` is usually empty for these.
+
 **This check does not stay true.** The user can close the window at any moment, and
 often does. Run `ensure` again right before each submit — see step 3.
 
@@ -54,7 +68,7 @@ that is not on the list still submits fine and then fails at `turn/start`.
 | Field | Meaning |
 |---|---|
 | `slug` | What goes into `--model`, verbatim |
-| `efforts` | The `--effort` values this model accepts. Do not use one that is missing |
+| `efforts` | The `--effort` values this model accepts. Do not use one that is missing. An empty list means the model takes no effort setting — omit `--effort` |
 | `default` | The model used when you omit `--model` |
 | `default_effort` | The effort used when you omit `--effort`. `null` means codex decides |
 | `description` | One line on what the model is for. **This is what you choose by** |
@@ -176,7 +190,8 @@ echo "$CLAUDE_CODE_SESSION_ID"   # if empty, use the fallback below
 ```
 
 If the variable is empty, pass a fixed string that identifies this session instead
-(for example `plan-2026-08-21`). Do not pass an empty value.
+(for example `plan-2026-08-21`). Do not pass an empty value — the job then shows up
+as a bare `Claude` in the list, indistinguishable from every other session's.
 
 ### Choosing sandbox and approval
 
@@ -217,7 +232,8 @@ versions; the descriptions say what each model is for.
 
 Check `usage.remaining_percent` first. When it is low, a cheaper model finishes the
 job without burning through the user's window — say so rather than silently picking
-the biggest one.
+the biggest one. On a setup where `provider.chatgpt_auth` is `false` the field is
+`null` and there is no window to spend — pick on `description` alone.
 
 If the user names a model, use it and do not second-guess them.
 
@@ -350,8 +366,8 @@ There are no query commands. Submit one job, wait for it with `--wait`, done.
 - **Do not pass an empty `--client-id`.** The user loses track of which session a
   job came from.
 - **Do not run `--wait` in the foreground.** Long jobs will hit the tool timeout.
-- **Do not retry when `ensure` exits 5.** Usage limits and sign-in are the user's to
-  fix.
+- **Do not retry when `ensure` exits 5.** Whatever `blockers` names — a missing CLI,
+  sign-in, an exhausted window — is the user's to fix, not yours to work around.
 - **Do not launch the app yourself.** Use `ensure` instead of backgrounding
   `codex-shuttle gui` — `ensure` handles the app dying with your session.
 - **Do not reach for `--sandbox danger-full-access`.** Only when the user asks for it

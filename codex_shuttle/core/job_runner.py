@@ -17,7 +17,6 @@ from codex_shuttle.core.job import (
     ApprovalRequest,
     Job,
     JobItem,
-    JobOrigin,
     JobSpec,
     JobState,
     item_text,
@@ -106,16 +105,14 @@ class JobRunner(QObject):
         return [self._jobs[job_id] for job_id in self._order]
 
     def client_jobs(self, client_id: str = "") -> list[Job]:
-        """HTTP 창구에 노출할 잡만 고른다.
+        """HTTP 창구에 노출할 잡을 고른다.
 
-        GUI에서 사람이 만든 잡은 클로드 세션이 제출한 것이 아니므로 제외한다.
-        client_id를 주면 그 클라이언트가 낸 잡으로 더 좁힌다.
+        client_id를 주면 그 클라이언트가 낸 잡으로 좁힌다. 비워 두면 전부다.
         """
         return [
             job
             for job in self.jobs()
-            if job.origin.is_visible_to_clients
-            and (not client_id or job.client_id == client_id)
+            if not client_id or job.client_id == client_id
         ]
 
     def job(self, job_id: str) -> Job | None:
@@ -123,24 +120,17 @@ class JobRunner(QObject):
         return self._jobs.get(job_id)
 
     def client_job(self, job_id: str, client_id: str = "") -> Job | None:
-        """HTTP 창구용 조회. 수동 잡은 id를 알아도 돌려주지 않는다."""
+        """HTTP 창구용 조회. 다른 클라이언트의 잡은 id를 알아도 돌려주지 않는다."""
         job = self._jobs.get(job_id)
-        if job is None or not job.origin.is_visible_to_clients:
+        if job is None:
             return None
         if client_id and job.client_id != client_id:
             return None
         return job
 
-    def submit(
-        self,
-        spec: JobSpec,
-        origin: JobOrigin = JobOrigin.LOCAL,
-        client_id: str = "",
-    ) -> Job:
+    def submit(self, spec: JobSpec, client_id: str = "") -> Job:
         """잡을 제출한다. 실패해도 Job 객체는 항상 돌려준다."""
-        job = Job(
-            job_id=new_job_id(), spec=spec, origin=origin, client_id=client_id
-        )
+        job = Job(job_id=new_job_id(), spec=spec, client_id=client_id)
         self._jobs[job.job_id] = job
         self._order.append(job.job_id)
         self._queue.append(job.job_id)

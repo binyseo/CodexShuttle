@@ -32,7 +32,7 @@
 | | |
 |---|---|
 | uv | [설치 안내](https://docs.astral.sh/uv/getting-started/installation/) — `winget install astral-sh.uv` (macOS: `brew install uv`) |
-| Codex CLI | `npm install -g @openai/codex` 후 `codex login` |
+| Codex CLI | `npm install -g @openai/codex` 후 `codex login`. 올라마 같은 로컬 모델 provider를 붙여 쓴다면 로그인은 필요 없습니다 |
 | OS | macOS · Windows (Qt 로컬 소켓 사용) |
 
 Python은 따로 설치할 필요가 없습니다. uv가 필요한 버전을 알아서 받아 씁니다.
@@ -61,6 +61,27 @@ codex-shuttle install-skill --project ~/proj  # 특정 폴더에
 여기까지가 사용자가 할 일의 전부입니다. 다음 클로드 세션부터는 스킬을 읽은
 클로드가 앱 실행부터 잡 회수까지 알아서 처리합니다.
 
+### 업데이트할 때는 스킬도 다시 깔아야 합니다
+
+`install-skill`은 패키지 안의 `SKILL.md`를 클로드가 읽는 자리로 **복사**합니다.
+그래서 `uv tool upgrade`로 패키지를 올려도 이미 배치된 스킬 파일은 예전 내용
+그대로 남습니다. 업그레이드 뒤에 같은 명령을 한 번 더 실행하세요.
+
+```bash
+uv tool upgrade codex-shuttle
+codex-shuttle install-skill --user
+```
+
+설치본 끝에는 어느 버전에서 나온 사본인지 표식이 붙습니다. 그 표식이 낡았으면
+**아무것도 묻지 않고 새 내용으로 덮어씁니다.** 이미 최신이면 `Already up to date`
+만 출력하고 파일에 손대지 않습니다.
+
+`--force`가 필요한 경우는 하나뿐입니다 — 배치된 파일을 직접 고쳐 뒀을 때. 이때는
+사용자가 고친 내용이 날아가지 않도록 덮어쓰기를 멈추고 알려 줍니다.
+
+`--project`로도 배치해 뒀다면 그 폴더마다 같은 명령을 한 번씩 실행합니다. 이미
+열려 있는 클로드 세션은 재시작해야 새 스킬을 읽습니다.
+
 ## GUI 화면 안내
 
 ### 환경 탭
@@ -78,11 +99,16 @@ Codex CLI 설치 상태, 계정 로그인, 사용 한도, 사용 가능한 모�
 
 하나라도 빨간색이면 그 카드의 안내대로 조치합니다. `F5`로 다시 검사할 수 있습니다.
 
+`config.toml`의 `model_provider`가 올라마 같은 로컬·외부 provider로 잡혀 있으면
+ChatGPT 로그인과 사용 한도가 해당하지 않습니다. 이때는 로그인 카드가 사라지고
+사용 한도는 회색 `Not used by ...`로 바뀌며, provider 이름이 Codex CLI 카드에
+표시됩니다. 로그인하지 않았다는 이유로 잡이 막히지도 않습니다.
+
 ### 작업 탭
 
 클로드가 배정한 잡 목록과 각 잡의 대화 상세를 확인할 수 있습니다.
 
-- 잡마다 `출처 · 상태 · 경과`가 붙습니다. 출처는 `수동` 또는 `client-id`입니다
+- 잡마다 `클로드 세션 · 상태 · 경과`가 붙습니다. 세션 자리에는 `client-id`가, 없으면 `Claude`가 들어갑니다
 - 승인 대기가 생기면 그 잡의 행이 깜빡입니다. 다른 탭에 있으면 **작업** 탭 라벨이 깜빡입니다
 - **중단** 으로 진행 중인 턴을 멈출 수 있습니다
 - **내역 저장** 으로 대화 전문을 Markdown이나 JSON으로 뽑습니다. 승인 이력도 함께 들어갑니다

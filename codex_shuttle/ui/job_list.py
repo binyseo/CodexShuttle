@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from codex_shuttle.core.job import Job, JobOrigin, JobState
+from codex_shuttle.core.job import Job, JobState
 from codex_shuttle.core.status import CheckStatus
 from codex_shuttle.ui import theme
 from codex_shuttle.ui.attention import AttentionFlasher
@@ -88,10 +88,13 @@ class JobListRow(QWidget):
         )
         self._title.setText(job.title)
 
-        # 어디서 들어온 잡인지 먼저 보여 준다. 사람이 만든 잡은 클로드 세션에
-        # 노출되지 않으므로, 목록에서도 구분되어야 헷갈리지 않는다.
-        origin = "Manual" if job.origin is JobOrigin.LOCAL else (job.client_id or "Claude")
-        parts = [origin, STATE_LABELS[job.state], format_elapsed(job.elapsed_sec)]
+        # 어느 클로드 세션이 낸 잡인지 먼저 보여 준다. 세션을 여러 개 띄워 두면
+        # 목록에서 구분이 되어야 헷갈리지 않는다.
+        parts = [
+            job.client_id or "Claude",
+            STATE_LABELS[job.state],
+            format_elapsed(job.elapsed_sec),
+        ]
         if job.pending_approvals:
             parts.append("{0} awaiting approval".format(len(job.pending_approvals)))
         self._subtitle.setText(" · ".join(parts))

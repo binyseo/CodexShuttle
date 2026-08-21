@@ -179,6 +179,8 @@ class StatusCard(QFrame):
             item = self._rows.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                # deleteLater만 하면 이벤트 루프가 돌기 전까지 화면에 남는다.
+                widget.setParent(None)
                 widget.deleteLater()
 
     def _apply_status_style(self) -> None:

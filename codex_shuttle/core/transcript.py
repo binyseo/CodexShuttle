@@ -7,7 +7,7 @@
 import json
 from datetime import datetime
 
-from codex_shuttle.core.job import ApprovalDecision, ApprovalRequest, Job, JobOrigin
+from codex_shuttle.core.job import ApprovalDecision, ApprovalRequest, Job
 
 _ITEM_TITLES = {
     "userMessage": "User",
@@ -96,7 +96,6 @@ def to_json(job: Job) -> str:
         "job_id": job.job_id,
         "label": job.title,
         "state": job.state.value,
-        "origin": job.origin.value,
         "client_id": job.client_id,
         "prompt": job.spec.prompt,
         "cwd": job.spec.cwd,
@@ -141,14 +140,10 @@ def to_json(job: Job) -> str:
 
 
 def _metadata_rows(job: Job) -> list[str]:
-    origin = "Manual (GUI)" if job.origin is JobOrigin.LOCAL else "Remote"
-    if job.client_id:
-        origin += " · " + job.client_id
-
     rows = [
         ("Job ID", job.job_id),
         ("State", _STATE_TITLES.get(job.state.value, job.state.value)),
-        ("Origin", origin),
+        ("Client", job.client_id or "(not set)"),
         ("Working folder", job.spec.cwd or "(not set)"),
         ("Model", job.spec.model or "(default)"),
         ("Reasoning effort", job.spec.effort or "(default)"),

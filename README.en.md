@@ -35,7 +35,7 @@ result of a job that was still running.
 | | |
 |---|---|
 | uv | [Install guide](https://docs.astral.sh/uv/getting-started/installation/) — `winget install astral-sh.uv` (macOS: `brew install uv`) |
-| Codex CLI | `npm install -g @openai/codex`, then `codex login` |
+| Codex CLI | `npm install -g @openai/codex`, then `codex login`. Signing in is not needed if you point codex at a local model provider such as Ollama |
 | OS | macOS · Windows (uses Qt local sockets) |
 
 No separate Python install is needed. uv fetches the right version on its own.
@@ -65,6 +65,28 @@ That is everything you have to do. From your next Claude session on, Claude
 reads the skill and handles the rest — from launching the app to collecting
 job results.
 
+### Updating? Install the skill again
+
+`install-skill` **copies** the packaged `SKILL.md` to where Claude reads it, so
+upgrading the package leaves the file you installed earlier untouched. Run the
+same command once more after an upgrade.
+
+```bash
+uv tool upgrade codex-shuttle
+codex-shuttle install-skill --user
+```
+
+The installed copy carries a stamp saying which version it came from. When that
+stamp is out of date the file is **overwritten without asking.** When it is
+already current you get `Already up to date` and the file is left alone.
+
+`--force` is for one case only: you edited the installed file yourself. Then the
+overwrite stops so your changes are not thrown away.
+
+If you also installed it with `--project`, run the same command once per folder.
+Claude sessions that are already open have to restart before they see the new
+skill.
+
 ## The GUI
 
 ### Environment tab
@@ -81,6 +103,11 @@ is wrong.
 | Usage limits | Remaining percentage and reset time |
 | Available models | The list |
 
+If `model_provider` in `config.toml` points at a local or third-party provider
+such as Ollama, ChatGPT sign-in and usage limits do not apply. The Sign-in card
+disappears, Usage limits turns grey with `Not used by ...`, and the provider name
+shows up on the Codex CLI card. Jobs are no longer blocked for being signed out.
+
 If any card is red, follow the guidance on that card. Press `F5` to re-check.
 
 ### Jobs tab
@@ -88,7 +115,7 @@ If any card is red, follow the guidance on that card. Press `F5` to re-check.
 Lists the jobs Claude has dispatched, with the full conversation detail for
 each.
 
-- Every job shows `origin · state · elapsed`. Origin is `Manual` or a `client-id`
+- Every job shows `Claude session · state · elapsed`. The session is the `client-id`, or `Claude` when none was passed
 - A job waiting for approval flashes its row. If you are on another tab, the **Jobs** tab label flashes
 - **Stop** interrupts the running turn
 - **Save transcript** exports the full conversation as Markdown or JSON, approval history included

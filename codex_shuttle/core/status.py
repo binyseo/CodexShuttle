@@ -7,6 +7,8 @@ class CheckStatus(Enum):
     """체크 카드 하나가 가질 수 있는 상태.
 
     UNKNOWN 은 아직 검사하지 않은 상태고, CHECKING 은 검사가 진행 중인 상태다.
+    NOT_APPLICABLE 은 검사가 끝났지만 이 환경에는 해당하지 않는 항목이다.
+    로컬 모델 provider를 쓰는 사용자에게 ChatGPT 사용 한도가 그렇다.
     나머지 셋은 검사가 끝난 뒤의 판정 결과다.
     """
 
@@ -15,8 +17,14 @@ class CheckStatus(Enum):
     OK = "ok"
     WARNING = "warning"
     ERROR = "error"
+    NOT_APPLICABLE = "not_applicable"
 
     @property
     def is_settled(self) -> bool:
         """검사가 끝나 판정이 확정된 상태인지."""
-        return self in (CheckStatus.OK, CheckStatus.WARNING, CheckStatus.ERROR)
+        return self in (
+            CheckStatus.OK,
+            CheckStatus.WARNING,
+            CheckStatus.ERROR,
+            CheckStatus.NOT_APPLICABLE,
+        )

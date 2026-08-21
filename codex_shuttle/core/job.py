@@ -15,21 +15,6 @@ APPROVAL_ON_REQUEST = "on-request"
 APPROVAL_UNTRUSTED = "untrusted"
 
 
-class JobOrigin(Enum):
-    """잡이 어디서 들어왔는지.
-
-    HTTP 창구는 REMOTE 잡만 보여 준다. 사람이 GUI에서 만든 잡은 클로드 세션이
-    제출한 것이 아니므로, 목록·조회·이벤트 어디에도 섞이면 안 된다.
-    """
-
-    LOCAL = "local"  # GUI의 새 잡 대화상자
-    REMOTE = "remote"  # 내장 HTTP 창구
-
-    @property
-    def is_visible_to_clients(self) -> bool:
-        return self is JobOrigin.REMOTE
-
-
 class JobState(Enum):
     """잡의 진행 상태.
 
@@ -157,9 +142,7 @@ class Job:
 
     job_id: str
     spec: JobSpec
-    # 기본값을 LOCAL로 둔다. 출처를 명시하지 않은 잡이 실수로 클로드 세션 쪽에
-    # 노출되는 것보다, 안 보이는 편이 안전하다.
-    origin: JobOrigin = JobOrigin.LOCAL
+    # 잡을 제출한 클로드 세션. 창구 조회를 그 세션 것으로 좁히는 데 쓴다.
     client_id: str = ""
     state: JobState = JobState.QUEUED
     thread_id: str | None = None

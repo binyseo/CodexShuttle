@@ -9,8 +9,10 @@
 """
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -56,6 +58,14 @@ _ERROR_INLINE_LIMIT = 2000
 
 # 스킬을 배치할 디렉터리 이름. `.claude/skills/<이 이름>/SKILL.md` 가 된다.
 _SKILL_NAME = "codex-shuttle"
+# 설치본 끝에 붙이는 출처 표식. 프론트매터에 넣으면 스킬 로더가 모르는 키를 보게
+# 되므로 주석으로 둔다. 버전만으로는 부족하다. git에서 받아 쓰는 사용자는 버전이
+# 그대로인 채 내용만 바뀌는 일이 흔해서, 내용 해시를 함께 찍어 비교한다.
+_SKILL_STAMP = "<!-- codex-shuttle skill: v{version} sha:{digest} -->"
+_SKILL_STAMP_RE = re.compile(
+    r"^<!-- codex-shuttle skill: v(?P<version>\S+) sha:(?P<digest>[0-9a-f]{12}) -->$",
+    re.MULTILINE,
+)
 
 _SANDBOXES = ("read-only", "workspace-write", "danger-full-access")
 _POLICIES = ("never", "on-request", "untrusted")
@@ -121,7 +131,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Under that project's .claude (defaults to the current folder)",
     )
     skill.add_argument(
-        "--force", action="store_true", help="Overwrite an existing file"
+        "--force",
+        action="store_true",
+        help="Overwrite even a file you edited by hand",
     )
     return parser
 
@@ -328,6 +340,9 @@ def _install_skill(args: argparse.Namespace) -> int:
     """패키지에 들어 있는 SKILL.md를 클로드가 읽는 자리로 복사한다.
 
     저장소를 체크아웃한 위치와 무관하게 동작하도록 패키지 데이터에서 꺼낸다.
+    사본이므로 패키지를 올려도 저절로 갱신되지 않는다. 그래서 이미 깔려 있으면
+    표식을 읽어 낡은 사본인지 판별하고, 낡았으면 그냥 덮어쓴다. 사용자가 손으로
+    고친 파일만 --force를 요구한다.
     """
     if args.user:
         root = Path.home()
@@ -337,20 +352,65 @@ def _install_skill(args: argparse.Namespace) -> int:
             raise ValueError("No such folder: " + str(root))
 
     target = root / ".claude" / "skills" / _SKILL_NAME / "SKILL.md"
-    if target.exists() and not args.force:
-        print("Already there: " + str(target), file=sys.stderr)
-        print("Pass --force to overwrite.", file=sys.stderr)
-        return EXIT_USAGE
-
     body = (
         resources.files("codex_shuttle").joinpath("skill/SKILL.md").read_text("utf-8")
     )
+
+    if target.exists() and not args.force:
+        verdict, message = _skill_verdict(target.read_text(encoding="utf-8"), body)
+        if verdict == "current":
+            print(message + ": " + str(target))
+            return EXIT_OK
+        if verdict == "edited":
+            print(message + ": " + str(target), file=sys.stderr)
+            print("Pass --force to overwrite it.", file=sys.stderr)
+            return EXIT_USAGE
+        print(message)
+
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(body, encoding="utf-8")
+    target.write_text(_stamped_skill(body), encoding="utf-8")
 
     print("Installed the skill at: " + str(target))
     print("Claude sessions already open have to restart to see it.")
     return EXIT_OK
+
+
+def _skill_digest(body: str) -> str:
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:12]
+
+
+def _stamped_skill(body: str) -> str:
+    """설치본 끝에 어느 버전에서 나온 사본인지 남긴다."""
+    stamp = _SKILL_STAMP.format(version=__version__, digest=_skill_digest(body))
+    return _strip_stamp(body) + "\n" + stamp + "\n"
+
+
+def _strip_stamp(text: str) -> str:
+    """표식과 꼬리 빈 줄을 뗀 본문. 내용 비교는 이 형태로 한다."""
+    return _SKILL_STAMP_RE.sub("", text).rstrip("\n") + "\n"
+
+
+def _skill_verdict(installed: str, body: str) -> tuple[str, str]:
+    """이미 깔려 있는 파일을 어떻게 다룰지 판정한다.
+
+    current 는 손댈 것이 없는 상태, edited 는 사용자가 고쳐 둔 상태,
+    stale 은 예전 패키지가 깔아 둔 사본이라 덮어써도 되는 상태다.
+    """
+    match = _SKILL_STAMP_RE.search(installed)
+    if match is None:
+        # 표식이 없다. 표식을 넣기 전 버전이 깔아 둔 사본이다.
+        return "stale", "Replacing a skill file that carries no version stamp."
+    if match.group("digest") != _skill_digest(body):
+        if match.group("version") == __version__:
+            return "stale", "Updating the skill file: same v{0}, new content.".format(
+                __version__
+            )
+        return "stale", "Updating the skill: v{0} -> v{1}.".format(
+            match.group("version"), __version__
+        )
+    if _strip_stamp(installed) != _strip_stamp(body):
+        return "edited", "The installed skill was edited by hand"
+    return "current", "Already up to date"
 
 
 def _read_prompt(args: argparse.Namespace) -> str:

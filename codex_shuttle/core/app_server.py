@@ -18,6 +18,8 @@ NOTIFY_ACCOUNT_UPDATED = "account/updated"
 METHOD_ACCOUNT_READ = "account/read"
 METHOD_RATE_LIMITS_READ = "account/rateLimits/read"
 METHOD_MODEL_LIST = "model/list"
+# 활성 모델 provider 확인용. 구버전 CLI에는 없어서 실패할 수 있다.
+METHOD_CONFIG_READ = "config/read"
 METHOD_THREAD_START = "thread/start"
 METHOD_TURN_START = "turn/start"
 METHOD_TURN_INTERRUPT = "turn/interrupt"

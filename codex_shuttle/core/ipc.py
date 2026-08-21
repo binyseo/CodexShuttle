@@ -16,7 +16,6 @@ from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from codex_shuttle.core.job import (
     ApprovalDecision,
     Job,
-    JobOrigin,
     JobSpec,
 )
 from codex_shuttle.core.job_runner import JobRunner
@@ -265,7 +264,7 @@ class LocalJobServer(QObject):
         self, socket: QLocalSocket, request_id: object, message: dict, client_id: str
     ) -> None:
         spec = build_spec(message.get("spec") or {})
-        job = self._runner.submit(spec, origin=JobOrigin.REMOTE, client_id=client_id)
+        job = self._runner.submit(spec, client_id=client_id)
         self._send(
             socket,
             {"id": request_id, "ok": True, "job_id": job.job_id, "job": job_snapshot(job)},

@@ -12,6 +12,7 @@ from codex_shuttle.core.codex_cli import CodexCliInfo
 from codex_shuttle.core.environment import EnvironmentMonitor
 from codex_shuttle.core.ipc import LocalJobServer
 from codex_shuttle.core.job_runner import JobRunner
+from codex_shuttle.core.provider import ProviderInfo
 from codex_shuttle.core.status import CheckStatus
 from codex_shuttle.ui import theme
 from codex_shuttle.ui.attention import AttentionFlasher
@@ -33,6 +34,8 @@ class MainWindow(QMainWindow):
         self._runner = JobRunner(self._monitor.client, self)
         self._pending_approvals = 0
         self._summary_parts: dict[str, tuple[CheckStatus, str]] = {}
+        # ChatGPT를 거치지 않는 provider면 로그인 항목을 요약에서도 뺀다.
+        self._show_signin = True
 
         self._environment = EnvironmentPanel()
         self._environment.refresh_button.clicked.connect(self._monitor.refresh)
@@ -70,6 +73,7 @@ class MainWindow(QMainWindow):
 
     def _connect_monitor(self) -> None:
         self._monitor.cliChanged.connect(self._on_cli)
+        self._monitor.providerChanged.connect(self._on_provider)
         self._monitor.accountChanged.connect(self._on_account)
         self._monitor.modelsChanged.connect(self._on_models)
         self._monitor.rateLimitsChanged.connect(self._on_rate_limits)
@@ -88,6 +92,11 @@ class MainWindow(QMainWindow):
             info.status is not CheckStatus.CHECKING
         )
         self._set_summary("CLI", info.status, info.version or info.headline)
+
+    def _on_provider(self, info: ProviderInfo) -> None:
+        self._environment.apply_provider(info)
+        self._show_signin = info.uses_chatgpt_auth
+        self._render_summary()
 
     def _on_account(self, info: AccountInfo) -> None:
         self._environment.apply_account(info)
@@ -119,6 +128,8 @@ class MainWindow(QMainWindow):
             return
         chunks = []
         for key in ("CLI", "Sign-in", "Limit"):
+            if key == "Sign-in" and not self._show_signin:
+                continue
             entry = self._summary_parts.get(key)
             if entry is None:
                 continue

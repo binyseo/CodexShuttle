@@ -12,6 +12,7 @@ from codex_shuttle.core.account import (
 )
 from codex_shuttle.core.app_server import (
     METHOD_ACCOUNT_READ,
+    METHOD_CONFIG_READ,
     METHOD_MODEL_LIST,
     METHOD_RATE_LIMITS_READ,
     NOTIFY_ACCOUNT_UPDATED,
@@ -19,6 +20,11 @@ from codex_shuttle.core.app_server import (
     AppServerClient,
 )
 from codex_shuttle.core.codex_cli import CodexCliChecker, CodexCliInfo
+from codex_shuttle.core.provider import (
+    ProviderInfo,
+    read_provider_from_file,
+    resolve_provider,
+)
 from codex_shuttle.core.status import CheckStatus
 
 _CLI_REQUIRED = "The Codex CLI has to be checked first."
@@ -29,9 +35,13 @@ class EnvironmentMonitor(QObject):
 
     CLI 확인이 먼저고, CLI가 정상일 때만 app-server를 띄워 계정·모델·사용량을
     읽는다. 그래서 하위 세 항목은 CLI 결과에 종속된다.
+
+    계정·사용량을 읽기 전에 활성 provider부터 확인한다. 로컬 provider만 쓰는
+    사용자에게는 ChatGPT 로그인과 사용 한도가 해당하지 않아, 판정 기준이 달라진다.
     """
 
     cliChanged = pyqtSignal(object)  # CodexCliInfo
+    providerChanged = pyqtSignal(object)  # ProviderInfo
     accountChanged = pyqtSignal(object)  # AccountInfo
     modelsChanged = pyqtSignal(object)  # ModelsInfo
     rateLimitsChanged = pyqtSignal(object)  # RateLimitInfo
@@ -42,6 +52,7 @@ class EnvironmentMonitor(QObject):
         self._client = AppServerClient(self)
 
         # CLI가 작업 가능 여부를 물어볼 수 있도록 최근 결과를 들고 있는다.
+        self._provider = ProviderInfo()
         self._account = AccountInfo()
         self._models = ModelsInfo()
         self._rate_limits = RateLimitInfo()
@@ -50,7 +61,7 @@ class EnvironmentMonitor(QObject):
         self.rateLimitsChanged.connect(self._remember_rate_limits)
 
         self._cli.stateChanged.connect(self._on_cli_state)
-        self._client.connected.connect(self._request_all)
+        self._client.connected.connect(self._read_provider)
         self._client.disconnected.connect(self._on_disconnected)
         self._client.notified.connect(self._on_notified)
 
@@ -81,17 +92,21 @@ class EnvironmentMonitor(QObject):
         CLI가 이걸 받아 사전 점검에 쓴다. blockers가 비어 있으면 작업 가능하다.
         """
         cli = self._cli.info
+        provider = self._provider
         account = self._account
         usage = self._rate_limits
 
         blockers: list[str] = []
         if not cli.is_available:
             blockers.append("The Codex CLI is not usable: " + cli.headline)
-        if account.status is not CheckStatus.OK:
-            blockers.append("Check the sign-in state: " + account.headline)
-        if usage.is_exhausted:
-            reset = usage.primary.caption if usage.primary else ""
-            blockers.append("The usage limit is exhausted. " + reset)
+        # 로그인과 사용 한도는 ChatGPT를 거치는 provider에만 해당한다. 올라마 같은
+        # 로컬 provider만 붙여 쓰는 사용자는 로그인 없이도 codex가 정상으로 돈다.
+        if provider.uses_chatgpt_auth:
+            if account.status is not CheckStatus.OK:
+                blockers.append("Check the sign-in state: " + account.headline)
+            if usage.is_exhausted:
+                reset = usage.primary.caption if usage.primary else ""
+                blockers.append("The usage limit is exhausted. " + reset)
 
         return {
             "ready": not blockers,
@@ -101,6 +116,13 @@ class EnvironmentMonitor(QObject):
                 "installed": cli.executable is not None,
                 "version": cli.version,
                 "executable": cli.executable,
+            },
+            # 로그인·사용 한도를 검사해야 하는 환경인지 알려 준다. chatgpt_auth가
+            # false면 account와 usage는 참고용일 뿐 작업 가능 여부와 무관하다.
+            "provider": {
+                "name": provider.display_name,
+                "chatgpt_auth": provider.uses_chatgpt_auth,
+                "source": provider.source,
             },
             "account": {
                 "status": account.status.value,
@@ -164,10 +186,51 @@ class EnvironmentMonitor(QObject):
             return
 
         if self._client.is_ready:
-            self._request_all()
+            self._read_provider()
         else:
             # start()는 이미 떠 있으면 아무것도 하지 않는다. 준비되면 connected로 이어진다.
             self._client.start(info.executable)
+
+    def _read_provider(self) -> None:
+        """활성 provider를 먼저 확인하고, 그 결과를 들고 나머지 조회로 넘어간다.
+
+        계정·사용량 판정이 provider에 따라 달라지므로 응답 순서에 맡기지 않고
+        한 번 더 왕복한다. 로컬 왕복이라 비용은 무시할 만하다.
+        """
+        self._client.request(
+            METHOD_CONFIG_READ,
+            {"includeLayers": False},
+            on_result=self._on_provider_result,
+            # config/read가 없는 구버전 CLI다. 설정 파일에서 직접 읽어 본다.
+            on_error=lambda _message: self._apply_provider(read_provider_from_file()),
+        )
+
+    def _on_provider_result(self, result: dict) -> None:
+        self._apply_provider(resolve_provider(result))
+
+    def _apply_provider(self, info: ProviderInfo) -> None:
+        self._provider = info
+        self.providerChanged.emit(info)
+        self._request_all()
+
+    def _emit_rate_limits(self, info: RateLimitInfo) -> None:
+        """ChatGPT 한도를 쓰지 않는 provider면 수치 대신 '해당 없음'으로 바꾼다.
+
+        로컬 provider에서는 이 창이 소비되지 않아 늘 100%로 남는다. 그대로 두면
+        멀쩡한 잔여량으로 읽혀 오해를 부른다.
+        """
+        if not self._provider.uses_chatgpt_auth:
+            info = RateLimitInfo(
+                status=CheckStatus.NOT_APPLICABLE,
+                headline="Not used by " + self._provider.display_name,
+                detail=(
+                    "The active model provider is \"{0}\", which does not go through "
+                    "ChatGPT. Usage limits and sign-in do not apply.".format(
+                        self._provider.display_name
+                    )
+                ),
+            )
+        self.rateLimitsChanged.emit(info)
 
     def _request_all(self) -> None:
         self._emit_dependents(CheckStatus.CHECKING, "Loading…")
@@ -191,10 +254,8 @@ class EnvironmentMonitor(QObject):
         )
         self._client.request(
             METHOD_RATE_LIMITS_READ,
-            on_result=lambda result: self.rateLimitsChanged.emit(
-                parse_rate_limits(result)
-            ),
-            on_error=lambda message: self.rateLimitsChanged.emit(
+            on_result=lambda result: self._emit_rate_limits(parse_rate_limits(result)),
+            on_error=lambda message: self._emit_rate_limits(
                 RateLimitInfo(
                     status=CheckStatus.ERROR, headline="Request failed", detail=message
                 )
@@ -203,7 +264,7 @@ class EnvironmentMonitor(QObject):
 
     def _on_notified(self, method: str, params: dict) -> None:
         if method == NOTIFY_RATE_LIMITS_UPDATED:
-            self.rateLimitsChanged.emit(parse_rate_limits(params))
+            self._emit_rate_limits(parse_rate_limits(params))
         elif method == NOTIFY_ACCOUNT_UPDATED:
             # 알림에는 인증 방식과 플랜만 실려 있어서 전체를 다시 읽는다.
             self._client.request(

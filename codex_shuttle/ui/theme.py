@@ -11,6 +11,7 @@ _LIGHT = {
     CheckStatus.OK: "#1a7f37",
     CheckStatus.WARNING: "#bf8700",
     CheckStatus.ERROR: "#cf222e",
+    CheckStatus.NOT_APPLICABLE: "#8c959f",
 }
 
 _DARK = {
@@ -19,6 +20,7 @@ _DARK = {
     CheckStatus.OK: "#3fb950",
     CheckStatus.WARNING: "#d29922",
     CheckStatus.ERROR: "#f85149",
+    CheckStatus.NOT_APPLICABLE: "#8b949e",
 }
 
 STATUS_TEXT = {
@@ -27,6 +29,7 @@ STATUS_TEXT = {
     CheckStatus.OK: "OK",
     CheckStatus.WARNING: "Warning",
     CheckStatus.ERROR: "Error",
+    CheckStatus.NOT_APPLICABLE: "Not applicable",
 }
 
 CARD_STYLE = """
