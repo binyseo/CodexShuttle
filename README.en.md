@@ -47,8 +47,7 @@ uv tool install git+https://github.com/binyseo/CodexShuttle
 ```
 
 No clone, no virtualenv. This one line creates an isolated environment and puts
-the `codex-shuttle` command on your PATH. Update with
-`uv tool upgrade codex-shuttle`.
+the `codex-shuttle` command on your PATH.
 
 ### Installing the skill
 
@@ -65,27 +64,25 @@ That is everything you have to do. From your next Claude session on, Claude
 reads the skill and handles the rest — from launching the app to collecting
 job results.
 
-### Updating? Install the skill again
-
-`install-skill` **copies** the packaged `SKILL.md` to where Claude reads it, so
-upgrading the package leaves the file you installed earlier untouched. Run the
-same command once more after an upgrade.
+### Updating
 
 ```bash
 uv tool upgrade codex-shuttle
-codex-shuttle install-skill --user
 ```
 
-The installed copy carries a stamp saying which version it came from. When that
-stamp is out of date the file is **overwritten without asking.** When it is
-already current you get `Already up to date` and the file is left alone.
+The skill file usually takes care of itself. What `install-skill` puts on disk is
+a copy, so upgrading the tool does not refresh it — but the environment check
+Claude runs before every handoff spots a stale copy, reinstalls it, and says so.
 
-`--force` is for one case only: you edited the installed file yourself. Then the
-overwrite stops so your changes are not thrown away.
+Two cases still need you.
 
-If you also installed it with `--project`, run the same command once per folder.
-Claude sessions that are already open have to restart before they see the new
-skill.
+| Situation | Command |
+|---|---|
+| Coming from a version before 0.3.0 — skills from back then carry no self-update instruction, so install once by hand | `codex-shuttle install-skill --user` |
+| You edited the installed file yourself — the automatic refresh leaves it alone so your changes survive | `codex-shuttle install-skill --user --force` |
+
+If you installed it with `--project`, use `--project` in place of `--user`. Claude
+sessions that are already open have to restart before they see the new skill.
 
 ## The GUI
 

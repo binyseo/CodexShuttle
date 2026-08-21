@@ -351,10 +351,8 @@ def _install_skill(args: argparse.Namespace) -> int:
         if not root.is_dir():
             raise ValueError("No such folder: " + str(root))
 
-    target = root / ".claude" / "skills" / _SKILL_NAME / "SKILL.md"
-    body = (
-        resources.files("codex_shuttle").joinpath("skill/SKILL.md").read_text("utf-8")
-    )
+    target = _skill_path(root)
+    body = _packaged_skill()
 
     if target.exists() and not args.force:
         verdict, message = _skill_verdict(target.read_text(encoding="utf-8"), body)
@@ -373,6 +371,50 @@ def _install_skill(args: argparse.Namespace) -> int:
     print("Installed the skill at: " + str(target))
     print("Claude sessions already open have to restart to see it.")
     return EXIT_OK
+
+
+def _packaged_skill() -> str:
+    """패키지에 들어 있는 SKILL.md 본문."""
+    return resources.files("codex_shuttle").joinpath("skill/SKILL.md").read_text("utf-8")
+
+
+def _skill_path(root: Path) -> Path:
+    return root / ".claude" / "skills" / _SKILL_NAME / "SKILL.md"
+
+
+def _skill_status() -> dict:
+    """배치된 스킬 사본이 지금 툴과 같은 판본인지 확인한다.
+
+    사본이라 툴만 올려서는 갱신되지 않고, 사용자가 재설치를 잊으면 클로드가 낡은
+    지시를 읽은 채로 계속 돈다. 사용자 스코프와 현재 폴더 두 자리를 본다.
+    """
+    body = _packaged_skill()
+    stale: list[dict] = []
+    for scope, root, flag in (
+        ("user", Path.home(), "--user"),
+        ("project", Path.cwd(), "--project"),
+    ):
+        path = _skill_path(root)
+        try:
+            installed = path.read_text(encoding="utf-8")
+        except OSError:
+            # 그 자리에는 배치하지 않았다. 확인할 것이 없다.
+            continue
+        verdict, _message = _skill_verdict(installed, body)
+        # edited 는 사용자가 고쳐 둔 파일이라 낡음으로 보지 않는다. 덮어쓰라고
+        # 시키면 사용자의 수정이 날아간다.
+        if verdict != "stale":
+            continue
+        match = _SKILL_STAMP_RE.search(installed)
+        stale.append(
+            {
+                "scope": scope,
+                "path": str(path),
+                "installed_version": match.group("version") if match else None,
+                "command": "codex-shuttle install-skill " + flag,
+            }
+        )
+    return {"tool_version": __version__, "outdated": bool(stale), "stale": stale}
 
 
 def _skill_digest(body: str) -> str:
@@ -508,6 +550,8 @@ def _emit_health(response: dict) -> int:
         print(response.get("error") or "The request failed.", file=sys.stderr)
         return EXIT_USAGE
 
+    # 클로드가 매 세션 부르는 자리라, 배치된 스킬 사본이 낡았는지도 여기서 알린다.
+    response["skill"] = _skill_status()
     print(json.dumps(response, ensure_ascii=False, indent=2))
     if response.get("ready") is False:
         for blocker in response.get("blockers") or []:

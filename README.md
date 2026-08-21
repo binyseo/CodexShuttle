@@ -44,8 +44,7 @@ uv tool install git+https://github.com/binyseo/CodexShuttle
 ```
 
 clone도 가상환경도 필요 없습니다. 이 한 줄이 격리된 환경을 만들고
-`codex-shuttle` 명령을 PATH에 등록합니다. 업데이트는
-`uv tool upgrade codex-shuttle` 로 합니다.
+`codex-shuttle` 명령을 PATH에 등록합니다.
 
 ### 스킬 배치
 
@@ -61,26 +60,25 @@ codex-shuttle install-skill --project ~/proj  # 특정 폴더에
 여기까지가 사용자가 할 일의 전부입니다. 다음 클로드 세션부터는 스킬을 읽은
 클로드가 앱 실행부터 잡 회수까지 알아서 처리합니다.
 
-### 업데이트할 때는 스킬도 다시 깔아야 합니다
-
-`install-skill`은 패키지 안의 `SKILL.md`를 클로드가 읽는 자리로 **복사**합니다.
-그래서 `uv tool upgrade`로 패키지를 올려도 이미 배치된 스킬 파일은 예전 내용
-그대로 남습니다. 업그레이드 뒤에 같은 명령을 한 번 더 실행하세요.
+### 업데이트
 
 ```bash
 uv tool upgrade codex-shuttle
-codex-shuttle install-skill --user
 ```
 
-설치본 끝에는 어느 버전에서 나온 사본인지 표식이 붙습니다. 그 표식이 낡았으면
-**아무것도 묻지 않고 새 내용으로 덮어씁니다.** 이미 최신이면 `Already up to date`
-만 출력하고 파일에 손대지 않습니다.
+스킬 파일은 대개 신경 쓰지 않아도 됩니다. `install-skill`이 배치한 것은 사본이라
+툴만 올려서는 갱신되지 않지만, 클로드가 잡을 던지기 전 환경 점검에서 낡은 사본을
+발견하면 스스로 다시 깔고 그 사실을 알려 줍니다.
 
-`--force`가 필요한 경우는 하나뿐입니다 — 배치된 파일을 직접 고쳐 뒀을 때. 이때는
-사용자가 고친 내용이 날아가지 않도록 덮어쓰기를 멈추고 알려 줍니다.
+직접 실행해야 하는 경우는 둘뿐입니다.
 
-`--project`로도 배치해 뒀다면 그 폴더마다 같은 명령을 한 번씩 실행합니다. 이미
-열려 있는 클로드 세션은 재시작해야 새 스킬을 읽습니다.
+| 상황 | 명령 |
+|---|---|
+| 0.3.0 이전에서 올라오는 중 — 그 시절 스킬에는 자동 갱신 안내가 없어 한 번은 직접 깔아야 합니다 | `codex-shuttle install-skill --user` |
+| 배치된 파일을 손으로 고쳐 뒀을 때 — 사용자의 수정이 날아가지 않도록 자동 갱신이 비켜 갑니다 | `codex-shuttle install-skill --user --force` |
+
+`--project`로 배치해 뒀다면 `--user` 자리에 `--project`를 씁니다. 이미 열려 있는
+클로드 세션은 재시작해야 새 스킬을 읽습니다.
 
 ## GUI 화면 안내
 

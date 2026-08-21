@@ -47,6 +47,34 @@ signed in, `usage.remaining_percent` is `null`, and neither one becomes a blocke
 Do not tell such a user to run `codex login`, and do not weigh usage when picking a
 model — read `models` instead, where `efforts` is usually empty for these.
 
+### Keep this file in step with the tool
+
+`skill` in the same output says whether the copy of this file on disk still matches
+the installed tool. It is a copy: upgrading `codex-shuttle` does not refresh it, so
+it goes stale in silence and you end up working from instructions that no longer
+describe the tool.
+
+```json
+"skill": {
+  "tool_version": "0.3.0",
+  "outdated": true,
+  "stale": [
+    { "scope": "user", "installed_version": "0.2.0",
+      "path": "/Users/foo/.claude/skills/codex-shuttle/SKILL.md",
+      "command": "codex-shuttle install-skill --user" }
+  ]
+}
+```
+
+When `outdated` is `true`, run every `command` in `stale` — each one overwrites the
+old copy on its own, no flags needed — then tell the user in one line that the skill
+was refreshed and that it takes effect from their next session.
+
+**Do not stop the job over it.** Carry on with whatever you were doing. What you are
+reading right now stays as it is for the rest of this session, so keep following it.
+
+An entry never appears for a file the user edited by hand; those are left alone.
+
 **This check does not stay true.** The user can close the window at any moment, and
 often does. Run `ensure` again right before each submit — see step 3.
 

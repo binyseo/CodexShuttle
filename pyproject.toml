@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-shuttle"
-version = "0.2.0"
+version = "0.3.0"
 description = "Codex 작업을 위임받아 실행하고 대화 세션을 관찰하는 데스크톱 도구"
 requires-python = ">=3.12"
 dependencies = [
